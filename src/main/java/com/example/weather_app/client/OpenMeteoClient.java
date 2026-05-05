@@ -1,7 +1,9 @@
 package com.example.weather_app.client;
+
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import com.example.weather_app.exception.WeatherDataException;
 import com.example.weather_app.model.WeatherData;
 
 import tools.jackson.databind.JsonNode;
@@ -16,8 +18,7 @@ public class OpenMeteoClient {
 
     public OpenMeteoClient(RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
-        this.objectMapper = objectMapper; 
-
+        this.objectMapper = objectMapper;
     }
 
     public WeatherData getWeatherData(double latitude, double longitude) {
@@ -26,26 +27,26 @@ public class OpenMeteoClient {
                 + "&longitude=" + longitude
                 + "&hourly=temperature_2m,wind_speed_10m,precipitation_probability"
                 + "&forecast_days=1";
-        
+
         try {
             String json = restTemplate.getForObject(url, String.class);
 
             JsonNode root = objectMapper.readTree(json);
             JsonNode hourly = root.get("hourly");
 
+            if (hourly == null) {
+                throw new WeatherDataException("Weather API response did not contain hourly data");
+            }
+
             double temperature = hourly.get("temperature_2m").get(0).asDouble();
-            double windSpeed = hourly.get("wind_speed_10m").get(0).asDouble(); 
-            double precipitationProbability = hourly.get("precipitation_probability").get(0).asDouble(); 
+            double windSpeed = hourly.get("wind_speed_10m").get(0).asDouble();
+            double precipitationProbability = hourly.get("precipitation_probability").get(0).asDouble();
 
             return new WeatherData(temperature, windSpeed, precipitationProbability);
-
-
-
-        }catch (Exception e) {
-            throw new RuntimeException("Failed to fetch or parse weather data", e);
-
+        } catch (WeatherDataException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new WeatherDataException("Failed to fetch or parse weather data", e);
         }
-
-
     }
 }
